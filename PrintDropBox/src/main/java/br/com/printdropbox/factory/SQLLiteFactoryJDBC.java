@@ -1,5 +1,9 @@
 package br.com.printdropbox.factory;
 
 public class SQLLiteFactoryJDBC {
-asda
+
+	private void getConection() {
+		// TODO Auto-generated method stub
+
+	}
 }
