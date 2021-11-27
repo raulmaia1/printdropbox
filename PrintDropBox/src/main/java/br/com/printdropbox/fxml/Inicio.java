@@ -21,7 +21,7 @@ public class Inicio extends Application {
 		primaryStage.setScene(scene);
 		primaryStage.show();
 
-		
+		System.out.println("ok");
 	}
 
 }
