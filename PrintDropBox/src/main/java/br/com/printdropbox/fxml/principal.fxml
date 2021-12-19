@@ -12,7 +12,6 @@
       <HBox alignment="CENTER_LEFT" prefHeight="44.0" prefWidth="573.0" styleClass="topo" BorderPane.alignment="CENTER">
          <children>
             <Label styleClass="label-principal" text="Lista de Trabalhos " />
-            <Button fx:id="buttonMonitora" mnemonicParsing="false" onAction="#monitora" prefHeight="24.0" prefWidth="93.0" styleClass="root-layout" text="Monitorar" />
          </children>
          <padding>
             <Insets left="10.0" />
@@ -27,13 +26,21 @@
       </VBox>
    </center>
    <bottom>
-      <VBox prefHeight="41.0" prefWidth="573.0" spacing="2.0" styleClass="root-layout" BorderPane.alignment="CENTER">
+      <HBox alignment="CENTER_LEFT" prefHeight="37.0" prefWidth="573.0" spacing="5.0" styleClass="root-layout" BorderPane.alignment="CENTER">
          <children>
-            <Label fx:id="labelImpressora" styleClass="titulo-layout" text="Impressora" />
+            <Label fx:id="labelImpressora" prefHeight="25.0" prefWidth="435.0" styleClass="titulo-layout" text="Impressora" />
+            <HBox alignment="CENTER_RIGHT" prefHeight="37.0" prefWidth="429.0">
+               <children>
+                  <Button fx:id="btnConfigura" mnemonicParsing="false" onAction="#abri_configuracao" prefHeight="24.0" prefWidth="100.0" styleClass="text-field" text="Configurar" />
+               </children>
+               <padding>
+                  <Insets right="5.0" />
+               </padding>
+            </HBox>
          </children>
          <padding>
-            <Insets left="5.0" top="5.0" />
+            <Insets left="5.0" />
          </padding>
-      </VBox>
+      </HBox>
    </bottom>
 </BorderPane>

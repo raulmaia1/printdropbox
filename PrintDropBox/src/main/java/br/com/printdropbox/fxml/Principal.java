@@ -5,8 +5,10 @@ import java.awt.print.PrinterJob;
 import java.io.File;
 import java.io.IOException;
 import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.ResourceBundle;
-import java.util.function.Predicate;
 
 import javax.print.PrintService;
 import javax.print.PrintServiceLookup;
@@ -16,141 +18,178 @@ import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.printing.PDFPageable;
 
-import com.dropbox.core.DbxException;
-import com.dropbox.core.DbxRequestConfig;
-import com.dropbox.core.v2.DbxClientV2;
-import com.dropbox.core.v2.files.ListFolderResult;
-import com.dropbox.core.v2.files.Metadata;
-
+import br.com.printdropbox.dao.ConfiguracaoDaoJDBC;
+import br.com.printdropbox.task.ImpressaoTask;
 import javafx.application.Platform;
 import javafx.concurrent.Task;
 import javafx.fxml.FXML;
+import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
+import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.VBox;
+import javafx.stage.Stage;
 
 public class Principal implements Initializable {
 	@FXML
 	private Label labelImpressora;
 	@FXML
 	private VBox vBoxLista;
-
 	@FXML
-	private Button buttonMonitora;
+	private Button btnConfigura;
 
-	private static final String ACCESS_TOKEN = "hy9DJwxpI-4AAAAAAAAAARdhRIgTbB5CytDE_t3KGh6VrePsNxhxGNKHSZC-cTI7";
-	private static final String DIRETORIO = "/home/edu/Dropbox/Aplicativos/Print_CSR/CSR";
+	public List<File> listaImpressao = new ArrayList<>();
+	private String diretorio;
 	private PrintService myPrintService;
+
+	private Stage stagePrincipal;
+	public static Task<Void> task1;
 
 	@Override
 	public void initialize(URL arg0, ResourceBundle arg1) {
-		this.myPrintService = PrintServiceLookup.lookupDefaultPrintService();
-		Platform.runLater(() -> {
-			labelImpressora.setText(this.myPrintService.getName());
+
+		new ConfiguracaoDaoJDBC().getConfiguracao().ifPresent(cfg -> {
+			diretorio = cfg.getLocalPasta();
+			String impressora = cfg.getImpressora();
+
+			System.out.println(impressora);
+			Arrays.asList(PrintServiceLookup.lookupPrintServices(null, null)).stream()
+					.filter(p -> p.getName().equals(impressora)).findAny().ifPresent(print -> {
+						this.myPrintService = print;
+						Platform.runLater(() -> {
+							labelImpressora.setText(this.myPrintService.getName());
+						});
+					});
+
 		});
-		atualizaVBox();
+
+//		https://stackoverflow.com/a/44155625
+//		Design classe anonima para manipular componentes da classe Principal
+
+		ImpressaoTask impressaoTask = ((task) -> {
+
+			while (true) {
+				if (task.isCancelled()) {
+					break;
+				} else {
+					try {
+						Thread.sleep(2000);
+					} catch (InterruptedException e1) {
+						e1.printStackTrace();
+					}
+					for (File file : new File(diretorio).listFiles()) {
+						if (!listaImpressao.contains(file)) {
+							imprimirDocumento(file);
+							listaImpressao.add(file);
+							adicionaLabelETempoDeDoisSegundos(file.getName());
+						}
+					}
+					System.out.println("---");
+				}
+			}
+		});
+
+		Principal.task1 = new Task<Void>() {
+
+			@Override
+			protected Void call() throws Exception {
+				impressaoTask.verificarImpressao(this);
+				return null;
+			}
+
+		};
+
+		Thread thread1 = deletarPdfs(diretorio);
+		thread1.start();
+
+		try {
+			thread1.join();
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+
+		Thread thread2 = new Thread(task1);
+		thread2.start();
+	}
+
+	private void imprimirDocumento(File file) {
+
+		System.out.println("--------");
+		try {
+			Thread.sleep(3000);
+		} catch (InterruptedException e1) {
+			e1.printStackTrace();
+		}
+		System.out.println("--------");
+		String extension = FilenameUtils.getExtension(file.getAbsolutePath());
+
+		if (extension.contains("pdf") || extension.contains("PDF")) {
+//				https://stackoverflow.com/questions/16293859/print-a-pdf-file-using-printerjob-in-java
+
+			try {
+				PDDocument document = Loader.loadPDF(file);
+
+				PrinterJob job = PrinterJob.getPrinterJob();
+				job.setPageable(new PDFPageable(document));
+				job.setPrintService(myPrintService);
+				job.print();
+
+				System.out.println(job);
+
+			} catch (PrinterException e) {
+				e.printStackTrace();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
 	}
 
 	@FXML
-	private void monitora() {
-		Platform.runLater(() -> {
-			buttonMonitora.setDisable(true);
-		});
-
-		Task<Void> task = new Task<Void>() {
-			@Override
-			public Void call() {
-				while (true) {
-					if (new File(DIRETORIO).listFiles().length > 0) {
-						imprimirDocumentos();
-					}
-					Platform.runLater(() -> {
-						vBoxLista.getChildren().clear();
-					});
-					try {
-						Thread.sleep(2000);
-						atualizaVBox();
-					} catch (InterruptedException e) {
-						e.printStackTrace();
-					}
-				}
-				}
-			};
-
-		new Thread(task).start();
-
-	}
-
-	private void atualizaVBox() {
-
-		DbxRequestConfig config = DbxRequestConfig.newBuilder("csr").build();
-		DbxClientV2 client = new DbxClientV2(config, ACCESS_TOKEN);
-
+	private void abri_configuracao() {
+		Stage stage = new Stage();
+		FXMLLoader loader = new FXMLLoader();
+		loader.setLocation(Principal.class.getResource("configura.fxml"));
 		try {
+			Scene scene = new Scene(loader.load());
+			stage.setScene(scene);
 
-			ListFolderResult result = client.files().listFolder("/csr");
-			while (true) {
-				for (Metadata metadata : result.getEntries()) {
-					Platform.runLater(() -> {
-						Label label1 = new Label();
-						label1.setText(metadata.getName());
-						label1.getStyleClass().add("titulo-layout-secundario");
-						vBoxLista.getChildren().add(label1);
-					});
-					/// System.out.println(metadata.getPathLower());
-				}
+			ConfiguraFXML controller = loader.getController();
+			controller.setStage(stage, stagePrincipal);
+			stage.showAndWait();
 
-				if (!result.getHasMore()) {
-					break;
-				}
-
-				result = client.files().listFolderContinue(result.getCursor());
-			}
-
-		} catch (DbxException e) {
+		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
 
-	private void imprimirDocumentos() {
-		File fileDir = new File(DIRETORIO);
+	private void adicionaLabelETempoDeDoisSegundos(String nomeArquivo) {
 
-		Predicate<File> imprimir = ((fileDiretorio) -> {
+		Platform.runLater(() -> {
+			Label label1 = new Label("Ok - " + nomeArquivo);
+			label1.getStyleClass().add("titulo-layout-secundario");
+			vBoxLista.getChildren().add(label1);
 
-			for (File file : fileDiretorio.listFiles()) {
-				String extension = FilenameUtils.getExtension(file.getAbsolutePath());
-
-				if (extension.equals("pdf")) {
-//				https://stackoverflow.com/questions/16293859/print-a-pdf-file-using-printerjob-in-java
-
-					try {
-						PDDocument document = Loader.loadPDF(file);
-
-						PrinterJob job = PrinterJob.getPrinterJob();
-						job.setPageable(new PDFPageable(document));
-						job.setPrintService(myPrintService);
-						job.print();
-
-					} catch (PrinterException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					} catch (IOException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}
-
-				}
-			}
-
-			for (File file : fileDiretorio.listFiles()) {
-				file.delete();
-			}
-			return true;
 		});
-
-		imprimir.test(fileDir);
-
 	}
 
+	public void setStagePrincipal(Stage stagePrincipal) {
+		this.stagePrincipal = stagePrincipal;
+	}
+
+	private Thread deletarPdfs(String diretorio) {
+		Task<Void> task2 = new Task<Void>() {
+			@Override
+			protected Void call() throws Exception {
+				for (File file : new File(diretorio).listFiles()) {
+					file.delete();
+					System.out.println(file);
+				}
+				return null;
+			}
+
+		};
+
+		return new Thread(task2);
+	}
 }
