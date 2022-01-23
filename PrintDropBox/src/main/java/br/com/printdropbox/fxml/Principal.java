@@ -117,7 +117,7 @@ public class Principal implements Initializable {
 
 		System.out.println("--------");
 		try {
-			Thread.sleep(3000);
+			Thread.sleep(1500);
 		} catch (InterruptedException e1) {
 			e1.printStackTrace();
 		}
